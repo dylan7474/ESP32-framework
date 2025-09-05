@@ -1,124 +1,65 @@
-# ClosestPlane ESP32
+# ESP32 Framework
 
-An Arduino-compatible sketch for ESP32 boards that connects to a dump1090 server and renders a sweeping radar view on a 128×64 SH1106 OLED. Aircraft within the selected range appear as blips and a short tone plays as the sweep crosses each target. Volume, radar range and sweep speed are controlled with two rotary encoders and saved to EEPROM.
+A minimal Arduino sketch for ESP32 boards demonstrating use of a 128×64 SH1106 OLED display, two rotary encoders and I2S audio output. Use this as a starting point for your own applications.
 
 ## Required Libraries
 
-Install the following libraries in the Arduino IDE before compiling:
+Install these libraries in the Arduino IDE or with `arduino-cli` before compiling:
 
-- **ESP32 board support** (`esp32` by Espressif) – provides WiFi, HTTPClient, Wire and I2S functionality.
+- **ESP32 board support** (`esp32` by Espressif)
 - **Adafruit GFX Library**
 - **Adafruit SH110X**
-- **ArduinoJson**
-- **SimpleRotary** – handles the rotary encoders for volume and range control.
+- **SimpleRotary**
 
 ## Hardware Connections
-
-Connect the following components to your ESP32:
 
 - **SH1106 128×64 OLED** (I²C): SDA → GPIO21, SCL → GPIO22, plus 3.3 V and GND.
 - **MAX98357A I2S amplifier**: BCLK → GPIO17, LRCLK → GPIO16, DIN → GPIO27, SD → GPIO19, 3.3 V and GND.
 - **Volume rotary encoder**: A → GPIO33, B → GPIO4, switch → GPIO23.
-- **Range/channel rotary encoder**: A → GPIO25, B → GPIO32, switch → GPIO2.
+- **Channel rotary encoder**: A → GPIO25, B → GPIO32, switch → GPIO2.
 
 ## Setup
-1. Rename `config.h` with your WiFi credentials, dump1090 server address and your latitude/longitude. Adjust I2S pin numbers if required.
-2. Ensure the libraries above are installed in the Arduino IDE.
-3. Open `closestPlane.ino` in the Arduino IDE, select your ESP32 board and the correct port.
+
+1. Adjust the I2S pin numbers in `config.h` if required.
+2. Ensure the libraries above are installed.
+3. Open `framework.ino` in the Arduino IDE, select your ESP32 board and the correct port.
 4. Compile and upload.
 
 ## Operation
-- The display shows a radar sweep of aircraft within range. Each time the sweep crosses a target a short beep is produced.
-- Rotate the range encoder to adjust radar range.
-- Press the range encoder to switch the volume encoder between controlling beep volume and sweep speed.
-- Rotate the volume encoder to adjust the selected parameter.
-- Long-press the volume encoder to power off.
-- Settings persist in EEPROM and a small antenna icon indicates a good data connection.
+
+- The display shows current volume and channel values.
+- Rotate the volume encoder to change beep volume (0–20). Press it to play a high-pitched beep.
+- Rotate the channel encoder to change an integer counter. Press it to play a low-pitched beep.
+- Expand the sketch with your own application logic.
 
 ## Building in a Codex/Codespace Environment
 
-The following setup script prepares a Codex/Codespace container with all required tools and
-libraries for this project. Run it in your container before compiling:
+The following setup script prepares a Codespace container with all required tools and libraries for this project. Run it in your container before compiling:
+
 ```bash
 #!/bin/bash
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
-echo "==> Base packages"
 apt-get update
 apt-get install -y --no-install-recommends \
   curl ca-certificates git python3 tar xz-utils
 
-# --- Proxy handling ---
-# Mirror the proxy you see in Codex logs (http://proxy:8080) for all tools.
-HTTP_PROXY="${HTTP_PROXY:-${http_proxy:-}}"
-HTTPS_PROXY="${HTTPS_PROXY:-${https_proxy:-$HTTP_PROXY}}"
-NO_PROXY="${NO_PROXY:-${no_proxy:-localhost,127.0.0.1,::1}}"
-export HTTP_PROXY HTTPS_PROXY NO_PROXY
-# Some tools only read lowercase:
-export http_proxy="${HTTP_PROXY:-}"
-export https_proxy="${HTTPS_PROXY:-}"
-export no_proxy="${NO_PROXY:-}"
-
-echo "HTTP_PROXY=${HTTP_PROXY:-<unset>}"
-echo "HTTPS_PROXY=${HTTPS_PROXY:-<unset>}"
-echo "NO_PROXY=${NO_PROXY}"
-
-# --- Prefer IPv4 to avoid IPv6 'network is unreachable' ---
-if ! grep -q '^precedence ::ffff:0:0/96 100' /etc/gai.conf 2>/dev/null; then
-  echo 'precedence ::ffff:0:0/96 100' >> /etc/gai.conf
-fi
-
-# --- Helper: retry with backoff ---
-retry () {
-  local attempts="$1"; shift
-  local sleep_s="$1"; shift
-  local n=1
-  until "$@"; do
-    if [[ $n -ge $attempts ]]; then
-      echo "Command failed after $n attempts: $*" >&2
-      return 1
-    fi
-    echo "Retry $n/$attempts failed. Sleeping ${sleep_s}s…"
-    n=$((n+1))
-    sleep "$sleep_s"
-  done
-}
-
-echo "==> Installing arduino-cli"
 curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
 install -m 0755 bin/arduino-cli /usr/local/bin/arduino-cli
 rm -rf bin
-arduino-cli version
-
-echo "==> arduino-cli config"
 arduino-cli config init --overwrite
-
-# Boards index + proxy (this is the only network key we need)
 arduino-cli config set board_manager.additional_urls \
   https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-
-if [[ -n "${HTTPS_PROXY}" || -n "${HTTP_PROXY}" ]]; then
-  arduino-cli config set network.proxy "${HTTPS_PROXY:-$HTTP_PROXY}"
-fi
-
-# Optional: slightly longer socket timeout (older CLI versions may ignore this; safe if it errors)
-arduino-cli config set network.socket_timeout 60s || true
-
-echo "==> Updating indexes (via proxy, with retries)"
-retry 5 5 arduino-cli core update-index
-
-echo "==> Installing ESP32 core"
-retry 5 5 arduino-cli core install esp32:esp32
-
-echo "==> Installing libraries"
-retry 5 5 arduino-cli lib install "Adafruit GFX Library"
-retry 5 5 arduino-cli lib install "ArduinoJson"
-retry 5 5 arduino-cli lib install "Adafruit SH110X"
-retry 5 5 arduino-cli lib install "SimpleRotary"
-
-echo "✅ Setup complete. Compile with:"
-echo "   arduino-cli compile --fqbn esp32:esp32:esp32 closestPlane.ino"
+arduino-cli core update-index
+arduino-cli core install esp32:esp32
+arduino-cli lib install "Adafruit GFX Library"
+arduino-cli lib install "Adafruit SH110X"
+arduino-cli lib install "SimpleRotary"
 ```
 
-The command completes successfully when the required libraries (Adafruit SH110X, SimpleRotary, etc.) are installed.
+Compile with:
+
+```bash
+arduino-cli compile --fqbn esp32:esp32:esp32 framework.ino
+```
