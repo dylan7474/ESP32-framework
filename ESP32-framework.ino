@@ -4,6 +4,7 @@
 #include <Wire.h>
 #include <driver/i2s.h>
 #include <math.h>
+#include <WiFi.h>
 
 #include "config.h"
 
@@ -36,6 +37,11 @@ void encoderTask(void *pvParameters) {
 
 void setup() {
   Serial.begin(115200);
+
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+  }
 
   display.begin(0x3C, true);
   display.clearDisplay();
