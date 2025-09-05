@@ -61,5 +61,5 @@ arduino-cli lib install "SimpleRotary"
 Compile with:
 
 ```bash
-arduino-cli compile --fqbn esp32:esp32:esp32 framework.ino
+arduino-cli compile --fqbn esp32:esp32:esp32 ESP32-framework.ino
 ```
